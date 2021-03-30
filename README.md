@@ -5,7 +5,7 @@ Yet Another Dodgeball Plugin, specialized for MGE.
 # Features
 
 - Default MGE arena behavior. Join the server and type !add or !first to join an arena.
-- [WIP] Per-arena Dodgeball!
+- Full 1v1 arena Dodgeball! Multi-man WIP.
 
 # Requirements
 
