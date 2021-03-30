@@ -148,16 +148,15 @@ Handle g_hCvarDelayPreventionTime;
 Handle g_hCvarDelayPreventionSpeedup;
 
 // Gameplay
-bool g_bRoundStarted[MAXARENAS + 1]; // Has the round started?
-int g_iRocketsFired; // No. of rockets fired since round start
+int g_iRocketsFired[MAXARENAS + 1]; // No. of rockets fired since round start
 Handle g_hLogicTimer; // Logic timer
-float g_fLastRocketSpawnTime; // Time at which the last rocket had spawned
-float g_fNextRocketSpawnTime; // Time at which the next rocket will be able to spawn
-int g_iLastDeadTeam; // The team of the last dead client. If none, it's a random team.
-int g_iLastDeadClient; // The last dead client. If none, it's a random client.
-int g_iPlayerCount;
+float g_fLastRocketSpawnTime[MAXARENAS + 1]; // Time at which the last rocket had spawned
+float g_fNextRocketSpawnTime[MAXARENAS + 1]; // Time at which the next rocket will be able to spawn
+int g_iLastDeadTeam[MAXARENAS + 1]; // The team of the last dead client. If none, it's a random team.
+int g_iLastDeadClient[MAXARENAS + 1]; // The last dead client. If none, it's a random client.
+int g_iPlayerCount[MAXARENAS + 1];
 Handle g_hHud;
-int g_iRocketSpeed;
+int g_iRocketSpeed[MAXARENAS + 1];
 Handle g_hTimerHud;
 int g_nBounces[MAX_EDICTS];
 int g_config_iMaxBounces = 2;
@@ -222,17 +221,17 @@ int g_iRocketSpawnersCount;
 
 // Array containing the spawn points for the Red team, and
 // their associated spawner class.
-int g_iCurrentRedRocketSpawn;
-int g_iRocketSpawnPointsRedCount;
-int g_iRocketSpawnPointsRedClass[MAX_ROCKET_SPAWN_POINTS];
-int g_iRocketSpawnPointsRedEntity[MAX_ROCKET_SPAWN_POINTS];
+int g_iCurrentRedRocketSpawn[MAXARENAS + 1];
+int g_iRocketSpawnPointsRedCount[MAXARENAS + 1];
+int g_iRocketSpawnPointsRedClass[MAX_ROCKET_SPAWN_POINTS / (MAXARENAS + 1)][MAXARENAS + 1];
+int g_iRocketSpawnPointsRedEntity[MAX_ROCKET_SPAWN_POINTS / (MAXARENAS + 1)][MAXARENAS + 1];
 
 // Array containing the spawn points for the Blu team, and
 // their associated spawner class.
-int g_iCurrentBluRocketSpawn;
-int g_iRocketSpawnPointsBluCount;
-int g_iRocketSpawnPointsBluClass[MAX_ROCKET_SPAWN_POINTS];
-int g_iRocketSpawnPointsBluEntity[MAX_ROCKET_SPAWN_POINTS];
+int g_iCurrentBluRocketSpawn[MAXARENAS + 1];
+int g_iRocketSpawnPointsBluCount[MAXARENAS + 1];
+int g_iRocketSpawnPointsBluClass[MAX_ROCKET_SPAWN_POINTS / (MAXARENAS + 1)][MAXARENAS + 1];
+int g_iRocketSpawnPointsBluEntity[MAX_ROCKET_SPAWN_POINTS / (MAXARENAS + 1)][MAXARENAS + 1];
 
 // The default spawner class.
 int g_iDefaultRedRocketSpawner;
@@ -534,7 +533,7 @@ public void OnMapEnd()
 	UnhookEvent("player_team", Event_PlayerTeam, EventHookMode_Pre);
 	UnhookEvent("teamplay_round_start", Event_RoundStart, EventHookMode_Post);
 	
-	for (int arena_index = 1; arena_index < g_iArenaCount; arena_index++)
+	for (int arena_index = 1; arena_index <= g_iArenaCount; arena_index++)
 	{
 		if (g_bTimerRunning[arena_index])
 		{
@@ -732,31 +731,6 @@ int StartCountDown(int arena_index)
 		
 		if (red_f1 && blu_f1 && red_f2 && blu_f2)
 		{
-			float enginetime = GetGameTime();
-			
-			for (int i = 0; i <= 2; i++)
-			{
-				int ent = GetPlayerWeaponSlot(red_f1, i);
-				
-				if (IsValidEntity(ent))
-					SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + 1.1);
-				
-				ent = GetPlayerWeaponSlot(blu_f1, i);
-				
-				if (IsValidEntity(ent))
-					SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + 1.1);
-				
-				ent = GetPlayerWeaponSlot(red_f2, i);
-				
-				if (IsValidEntity(ent))
-					SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + 1.1);
-				
-				ent = GetPlayerWeaponSlot(blu_f2, i);
-				
-				if (IsValidEntity(ent))
-					SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + 1.1);
-			}
-			
 			g_iArenaCd[arena_index] = g_iArenaCdTime[arena_index] + 1;
 			g_iArenaStatus[arena_index] = AS_PRECOUNTDOWN;
 			CreateTimer(0.0, Timer_CountDown, arena_index, TIMER_FLAG_NO_MAPCHANGE);
@@ -774,21 +748,6 @@ int StartCountDown(int arena_index)
 		
 		if (red_f1 && blu_f1)
 		{
-			float enginetime = GetGameTime();
-			
-			for (int i = 0; i <= 2; i++)
-			{
-				int ent = GetPlayerWeaponSlot(red_f1, i);
-				
-				if (IsValidEntity(ent))
-					SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + 1.1);
-				
-				ent = GetPlayerWeaponSlot(blu_f1, i);
-				
-				if (IsValidEntity(ent))
-					SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + 1.1);
-			}
-			
 			g_iArenaCd[arena_index] = g_iArenaCdTime[arena_index] + 1;
 			g_iArenaStatus[arena_index] = AS_PRECOUNTDOWN;
 			CreateTimer(0.0, Timer_CountDown, arena_index, TIMER_FLAG_NO_MAPCHANGE);
@@ -1147,7 +1106,9 @@ void RemoveFromQueue(int client, bool calcstats = false, bool specfix = false)
 				MC_PrintToChatAll("%t", "JoinsArenaNoStats", playername, g_sArenaName[arena_index]);
 				
 				
-			} else {
+			}
+			else
+			{
 				if (foe && IsFakeClient(foe))
 				{
 					ConVar cvar = FindConVar("tf_bot_quota");
@@ -1437,7 +1398,6 @@ int ResetPlayer(int client)
 	int arena_index = g_iPlayerArena[client];
 	int player_slot = g_iPlayerSlot[client];
 	
-	
 	if (!arena_index || !player_slot)
 	{
 		return 0;
@@ -1463,9 +1423,16 @@ int ResetPlayer(int client)
 		if (class != TF2_GetPlayerClass(client))
 			TF2_SetPlayerClass(client, class);
 		TF2_RespawnPlayer(client);
-	} else {
+	}
+	else
+	{
 		TF2_RegeneratePlayer(client);
 		ExtinguishEntity(client);
+	}
+	
+	if (IsClientInGame(client) && IsPlayerAlive(client))
+	{
+		SetEntPropEnt(client, Prop_Data, "m_hActiveWeapon", GetPlayerWeaponSlot(client, TFWeaponSlot_Primary));
 	}
 	
 	g_iPlayerMaxHP[client] = GetEntProp(client, Prop_Data, "m_iMaxHealth");
@@ -1610,6 +1577,65 @@ public int Menu_Main(Menu menu, MenuAction action, int param1, int param2)
 	}
 }
 
+//   ___                     _
+//  / __|__ _ _ __  ___ _ __| |__ _ _  _
+// | (_ / _` | '  \/ -_) '_ \ / _` | || |
+//  \___\__,_|_|_|_\___| .__/_\__,_|\_, |
+//                     |_|          |__/
+
+/* OnDodgeBallGameFrame()
+**
+** Function called every tick of the Dodgeball logic timer.
+** -------------------------------------------------------------------------- */
+public Action OnDodgeBallGameFrame(Handle hTimer, any Data)
+{
+	for (int arena_index = 1; arena_index <= g_iArenaCount; arena_index++)
+	{
+		// Only if both teams are playing
+		if (BothTeamsPlayingInArea(arena_index) == false || g_iArenaStatus[arena_index] != AS_FIGHT)
+		{
+			continue;
+		}
+		
+		// Manage the active rockets
+		int iIndex = -1;
+		while ((iIndex = FindNextValidRocket(iIndex)) != -1)
+		{
+			switch (g_iRocketClassBehaviour[g_iRocketClass[iIndex]])
+			{
+				case Behaviour_Unknown: {  }
+				case Behaviour_Homing: { HomingRocketThink(iIndex, arena_index); }
+			}
+		}
+		
+		// Check if we need to fire more rockets.
+		if (GetGameTime() >= g_fNextRocketSpawnTime[arena_index])
+		{
+			if (g_iLastDeadTeam[arena_index] == view_as<int>(TFTeam_Red))
+			{
+				int iSpawnerEntity = g_iRocketSpawnPointsRedEntity[g_iCurrentRedRocketSpawn[arena_index]][arena_index];
+				int iSpawnerClass = g_iRocketSpawnPointsRedClass[g_iCurrentRedRocketSpawn[arena_index]][arena_index];
+				if (g_iRocketCount < g_iSpawnersMaxRockets[iSpawnerClass])
+				{
+					PrintToServer("Attempting to create red rocket in arena %s", g_sArenaName[arena_index]);
+					CreateRocket(iSpawnerEntity, iSpawnerClass, view_as<int>(TFTeam_Red), arena_index);
+					g_iCurrentRedRocketSpawn[arena_index] = (g_iCurrentRedRocketSpawn[arena_index] + 1) % g_iRocketSpawnPointsRedCount[arena_index];
+				}
+			}
+			else
+			{
+				int iSpawnerEntity = g_iRocketSpawnPointsBluEntity[g_iCurrentBluRocketSpawn[arena_index]][arena_index];
+				int iSpawnerClass = g_iRocketSpawnPointsBluClass[g_iCurrentBluRocketSpawn[arena_index]][arena_index];
+				if (g_iRocketCount < g_iSpawnersMaxRockets[iSpawnerClass])
+				{
+					CreateRocket(iSpawnerEntity, iSpawnerClass, view_as<int>(TFTeam_Blue), arena_index);
+					g_iCurrentBluRocketSpawn[arena_index] = (g_iCurrentBluRocketSpawn[arena_index] + 1) % g_iRocketSpawnPointsBluCount[arena_index];
+				}
+			}
+		}
+	}
+}
+
 //  ___         _       _
 // | _ \___  __| |_____| |_ ___
 // |   / _ \/ _| / / -_)  _(_-<
@@ -1619,7 +1645,7 @@ public int Menu_Main(Menu menu, MenuAction action, int param1, int param2)
 **
 ** Fires a new rocket entity from the spawner's position.
 ** -------------------------------------------------------------------------- */
-public void CreateRocket(int iSpawnerEntity, int iSpawnerClass, int iTeam)
+public void CreateRocket(int iSpawnerEntity, int iSpawnerClass, int iTeam, int arena_index)
 {
 	int iIndex = FindFreeRocketSlot();
 	if (iIndex != -1)
@@ -1640,18 +1666,18 @@ public void CreateRocket(int iSpawnerEntity, int iSpawnerClass, int iTeam)
 			GetEntPropVector(iSpawnerEntity, Prop_Send, "m_vecOrigin", fPosition);
 			GetEntPropVector(iSpawnerEntity, Prop_Send, "m_angRotation", fAngles);
 			GetAngleVectors(fAngles, fDirection, NULL_VECTOR, NULL_VECTOR);
-
+			
 			// Setup rocket entity.
 			SetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity", 0);
 			SetEntProp(iEntity, Prop_Send, "m_bCritical", (GetURandomFloatRange(0.0, 100.0) <= g_fRocketClassCritChance[iClass]) ? 1 : 0, 1);
 			SetEntProp(iEntity, Prop_Send, "m_iTeamNum", iTeam, 1);
 			SetEntProp(iEntity, Prop_Send, "m_iDeflected", 1);
 			TeleportEntity(iEntity, fPosition, fAngles, view_as<float>( { 0.0, 0.0, 0.0 } ));
-
+			
 			// Setup rocket structure with the newly created entity.
 			int iTargetTeam = (TestFlags(iFlags, RocketFlag_IsNeutral)) ? 0 : GetAnalogueTeam(iTeam);
-			int iTarget = SelectTarget(iTargetTeam);
-			float fModifier = CalculateModifier(iClass, 0);
+			int iTarget = SelectTarget(iTargetTeam, arena_index);
+			float fModifier = CalculateModifier(iClass, 0, arena_index);
 			g_bRocketIsValid[iIndex] = true;
 			g_iRocketFlags[iIndex] = iFlags;
 			g_iRocketDragType[iIndex] = iDragType;
@@ -1663,7 +1689,7 @@ public void CreateRocket(int iSpawnerEntity, int iSpawnerClass, int iTeam)
 			g_fRocketLastDeflectionTime[iIndex] = GetGameTime();
 			g_fRocketLastBeepTime[iIndex] = GetGameTime();
 			g_fRocketSpeed[iIndex] = CalculateRocketSpeed(iClass, fModifier);
-			g_iRocketSpeed = RoundFloat(g_fRocketSpeed[iIndex] * 0.042614);
+			g_iRocketSpeed[arena_index] = RoundFloat(g_fRocketSpeed[iIndex] * 0.042614);
 
 			CopyVectors(fDirection, g_fRocketDirection[iIndex]);
 			SetEntDataFloat(iEntity, FindSendPropInfo("CTFProjectile_Rocket", "m_iDeflected") + 4, CalculateRocketDamage(iClass, fModifier), true);
@@ -1682,9 +1708,9 @@ public void CreateRocket(int iSpawnerEntity, int iSpawnerClass, int iTeam)
 
 			// Done
 			g_iRocketCount++;
-			g_iRocketsFired++;
-			g_fLastRocketSpawnTime = GetGameTime();
-			g_fNextRocketSpawnTime = GetGameTime() + g_fRocketSpawnersInterval[iSpawnerClass];
+			g_iRocketsFired[arena_index]++;
+			g_fLastRocketSpawnTime[arena_index] = GetGameTime();
+			g_fNextRocketSpawnTime[arena_index] = GetGameTime() + g_fRocketSpawnersInterval[iSpawnerClass];
 			g_bRocketIsNuke[iIndex] = false;
 		}
 	}
@@ -1788,7 +1814,7 @@ int FindRocketByEntity(int iEntity)
 ** Logic process for the Behaviour_Homing type rockets, which is simply a
 ** homing rocket that picks a random target.
 ** -------------------------------------------------------------------------- */
-void HomingRocketThink(int iIndex)
+void HomingRocketThink(int iIndex, int arena_index)
 {
 	// Retrieve the rocket's attributes.
 	int iEntity = EntRefToEntIndex(g_iRocketEntity[iIndex]);
@@ -1798,12 +1824,12 @@ void HomingRocketThink(int iIndex)
 	int iTeam = GetEntProp(iEntity, Prop_Send, "m_iTeamNum", 1);
 	int iTargetTeam = (TestFlags(iFlags, RocketFlag_IsNeutral)) ? 0 : GetAnalogueTeam(iTeam);
 	int iDeflectionCount = GetEntProp(iEntity, Prop_Send, "m_iDeflected") - 1;
-	float fModifier = CalculateModifier(iClass, iDeflectionCount);
+	float fModifier = CalculateModifier(iClass, iDeflectionCount, arena_index);
 
 	// Check if the target is available
 	if (!IsValidClient(iTarget, true))
 	{
-		iTarget = SelectTarget(iTargetTeam);
+		iTarget = SelectTarget(iTargetTeam, arena_index);
 		if (!IsValidClient(iTarget, true))return;
 		g_iRocketTarget[iIndex] = EntIndexToEntRef(iTarget);
 
@@ -1851,12 +1877,12 @@ void HomingRocketThink(int iIndex)
 			UpdateRocketSkin(iEntity, iTeam, TestFlags(iFlags, RocketFlag_IsNeutral));
 		}
 		// Set new target & deflection count
-		iTarget = SelectTarget(iTargetTeam, iIndex);
+		iTarget = SelectTarget(iTargetTeam, arena_index, iIndex);
 		g_iRocketTarget[iIndex] = EntIndexToEntRef(iTarget);
 		g_iRocketDeflections[iIndex] = iDeflectionCount;
 		g_fRocketLastDeflectionTime[iIndex] = GetGameTime();
 		g_fRocketSpeed[iIndex] = CalculateRocketSpeed(iClass, fModifier);
-		g_iRocketSpeed = RoundFloat(g_fRocketSpeed[iIndex] * 0.042614);
+		g_iRocketSpeed[arena_index] = RoundFloat(g_fRocketSpeed[iIndex] * 0.042614);
 		g_bPreventingDelay = false;
 		
 		SetEntDataFloat(iEntity, FindSendPropInfo("CTFProjectile_Rocket", "m_iDeflected") + 4, CalculateRocketDamage(iClass, fModifier), true);
@@ -1902,7 +1928,7 @@ void HomingRocketThink(int iIndex)
 		
 		if (GetConVarBool(g_hCvarDelayPrevention))
 		{
-			checkRoundDelays(iIndex);
+			checkRoundDelays(iIndex, arena_index);
 		}
 	}
 
@@ -1914,11 +1940,11 @@ void HomingRocketThink(int iIndex)
 **
 ** Gets the modifier for the damage/speed/rotation calculations.
 ** -------------------------------------------------------------------------- */
-float CalculateModifier(int iClass, int iDeflections)
+float CalculateModifier(int iClass, int iDeflections, int arena_index)
 {
 	return iDeflections +
-	(g_iRocketsFired * g_fRocketClassRocketsModifier[iClass]) +
-	(g_iPlayerCount * g_fRocketClassPlayerModifier[iClass]);
+	(g_iRocketsFired[arena_index] * g_fRocketClassRocketsModifier[iClass]) +
+	(g_iPlayerCount[arena_index] * g_fRocketClassPlayerModifier[iClass]);
 }
 
 /* CalculateRocketDamage()
@@ -2095,8 +2121,11 @@ void DestroyRocketSpawners()
 		CloseHandle(g_hRocketSpawnersChancesTable[iIndex]);
 	}
 	g_iRocketSpawnersCount = 0;
-	g_iRocketSpawnPointsRedCount = 0;
-	g_iRocketSpawnPointsBluCount = 0;
+	for (int arena_index = 1; arena_index <= g_iArenaCount; arena_index++)
+	{
+		g_iRocketSpawnPointsRedCount[arena_index] = 0;
+		g_iRocketSpawnPointsBluCount[arena_index] = 0;
+	}
 	g_iDefaultRedRocketSpawner = -1;
 	g_iDefaultBluRocketSpawner = -1;
 	g_strSavedClassName[0] = '\0';
@@ -2107,52 +2136,68 @@ void DestroyRocketSpawners()
 **
 ** Iterates through all the possible rocket spawn points and assigns them a spawner.
 ** -------------------------------------------------------------------------- */
-void PopulateRocketSpawnPoints()
+void PopulateRocketSpawnPoints(int arena_index)
 {
 	// Clear the current settings
-	g_iRocketSpawnPointsRedCount = 0;
-	g_iRocketSpawnPointsBluCount = 0;
-
+	g_iRocketSpawnPointsRedCount[arena_index] = 0;
+	g_iRocketSpawnPointsBluCount[arena_index] = 0;
+	
+	char spawnerNameRed[64];
+	// Spawners should have their arena name prepended.
+	strcopy(spawnerNameRed, sizeof(spawnerNameRed), g_sArenaName[arena_index]);
+	StrCat(spawnerNameRed, sizeof(spawnerNameRed), "_rocket_spawn_red");
+	
+	char spawnerNameBlu[64];
+	// Spawners should have their arena name prepended.
+	strcopy(spawnerNameBlu, sizeof(spawnerNameBlu), g_sArenaName[arena_index]);
+	StrCat(spawnerNameBlu, sizeof(spawnerNameBlu), "_rocket_spawn_blue");
+	
 	// Iterate through all the info target points and check 'em out.
 	int iEntity = -1;
 	while ((iEntity = FindEntityByClassname(iEntity, "info_target")) != -1)
 	{
 		char strName[32]; GetEntPropString(iEntity, Prop_Data, "m_iName", strName, sizeof(strName));
-		if ((StrContains(strName, "rocket_spawn_red") != -1) || (StrContains(strName, "tf_dodgeball_red") != -1))
+		if (StrEqual(strName, spawnerNameRed))
 		{
 			// Find most appropiate spawner class for this entity.
 			int iIndex = FindRocketSpawnerByName(strName);
-			if (!IsValidRocket(iIndex)) iIndex = g_iDefaultRedRocketSpawner;
+			if (!IsValidRocket(iIndex))
+			{
+				iIndex = g_iDefaultRedRocketSpawner;
+			}
 
 			// Upload to point list
-			g_iRocketSpawnPointsRedClass[g_iRocketSpawnPointsRedCount] = iIndex;
-			g_iRocketSpawnPointsRedEntity[g_iRocketSpawnPointsRedCount] = iEntity;
-			g_iRocketSpawnPointsRedCount++;
+			g_iRocketSpawnPointsRedClass[g_iRocketSpawnPointsRedCount[arena_index]][arena_index] = iIndex;
+			g_iRocketSpawnPointsRedEntity[g_iRocketSpawnPointsRedCount[arena_index]][arena_index] = iEntity;
+			g_iRocketSpawnPointsRedCount[arena_index]++;
 		}
-		if ((StrContains(strName, "rocket_spawn_blue") != -1) || (StrContains(strName, "tf_dodgeball_blu") != -1))
+		if (StrEqual(strName, spawnerNameBlu))
 		{
 			// Find most appropiate spawner class for this entity.
 			int iIndex = FindRocketSpawnerByName(strName);
-			if (!IsValidRocket(iIndex))iIndex = g_iDefaultBluRocketSpawner;
+			if (!IsValidRocket(iIndex))
+			{
+				iIndex = g_iDefaultBluRocketSpawner;
+			}
 
 			// Upload to point list
-			g_iRocketSpawnPointsBluClass[g_iRocketSpawnPointsBluCount] = iIndex;
-			g_iRocketSpawnPointsBluEntity[g_iRocketSpawnPointsBluCount] = iEntity;
-			g_iRocketSpawnPointsBluCount++;
+			g_iRocketSpawnPointsBluClass[g_iRocketSpawnPointsBluCount[arena_index]][arena_index] = iIndex;
+			g_iRocketSpawnPointsBluEntity[g_iRocketSpawnPointsBluCount[arena_index]][arena_index] = iEntity;
+			g_iRocketSpawnPointsBluCount[arena_index]++;
 		}
 	}
 
 	// Check if there exists spawn points
-	if (g_iRocketSpawnPointsRedCount == 0)
-		SetFailState("No RED spawn points found on this map.");
+	if (g_iRocketSpawnPointsRedCount[arena_index] == 0)
+		SetFailState("No RED spawn points found in this arena.");
 
-	if (g_iRocketSpawnPointsBluCount == 0)
-		SetFailState("No BLU spawn points found on this map.");
+	if (g_iRocketSpawnPointsBluCount[arena_index] == 0)
+		SetFailState("No BLU spawn points found in this arena.");
 }
 
 /* FindRocketSpawnerByName()
 **
-** Finds the first rocket spawner wich contains the given name.
+** Finds the first spawner wich contains the given name.
 ** -------------------------------------------------------------------------- */
 int FindRocketSpawnerByName(char strName[32])
 {
@@ -2453,7 +2498,9 @@ public Action Command_Spec(int client, int args)
 public Action Command_AddBot(int client, int args)
 {  //adding bot to client's arena
 	if (!IsValidClient(client))
+	{
 		return Plugin_Continue;
+	}
 	
 	int arena_index = g_iPlayerArena[client];
 	int player_slot = g_iPlayerSlot[client];
@@ -2793,48 +2840,6 @@ void EnableDodgeball()
 	PrecacheParticle(PARTICLE_NUKE_4);
 	PrecacheParticle(PARTICLE_NUKE_5);
 	PrecacheParticle(PARTICLE_NUKE_COLLUMN);
-
-	// Done.
-	for (int arena_index = 1; arena_index < g_iArenaCount; arena_index++)
-	{
-		if (g_bRoundStarted[arena_index])
-		{
-			g_bRoundStarted[arena_index] = false;
-		}
-	}
-	
-	PopulateRocketSpawnPoints();
-	
-	if (g_iLastDeadTeam == 0)
-	{
-		g_iLastDeadTeam = GetURandomIntRange(view_as<int>(TFTeam_Red), view_as<int>(TFTeam_Blue));
-	}
-	if (!IsValidClient(g_iLastDeadClient))g_iLastDeadClient = 0;
-
-	g_hLogicTimer = CreateTimer(FPS_LOGIC_INTERVAL, OnDodgeBallGameFrame, _, TIMER_REPEAT);
-	g_iPlayerCount = CountAlivePlayers();
-	g_iRocketsFired = 0;
-	g_iCurrentRedRocketSpawn = 0;
-	g_iCurrentBluRocketSpawn = 0;
-	g_fNextRocketSpawnTime = GetGameTime();
-	
-	if (BothTeamsPlaying())
-	{
-		PopulateRocketSpawnPoints();
-	
-		if (g_iLastDeadTeam == 0)
-		{
-			g_iLastDeadTeam = GetURandomIntRange(view_as<int>(TFTeam_Red), view_as<int>(TFTeam_Blue));
-		}
-		if (!IsValidClient(g_iLastDeadClient))g_iLastDeadClient = 0;
-	
-		g_hLogicTimer = CreateTimer(FPS_LOGIC_INTERVAL, OnDodgeBallGameFrame, _, TIMER_REPEAT);
-		g_iPlayerCount = CountAlivePlayers();
-		g_iRocketsFired = 0;
-		g_iCurrentRedRocketSpawn = 0;
-		g_iCurrentBluRocketSpawn = 0;
-		g_fNextRocketSpawnTime = GetGameTime();
-	}
 }
 
 /* DisableDodgeball()
@@ -2847,20 +2852,14 @@ void DisableDodgeball()
 	DestroyRockets();
 	DestroyRocketClasses();
 	DestroyRocketSpawners();
-	if (g_hLogicTimer != INVALID_HANDLE)KillTimer(g_hLogicTimer);
+	if (g_hLogicTimer != INVALID_HANDLE)
+	{
+		KillTimer(g_hLogicTimer);
+	}
 	g_hLogicTimer = INVALID_HANDLE;
 
 	// Unhook events and info_target outputs;
 	UnhookEvent("post_inventory_application", Event_PlayerInventory, EventHookMode_Post);
-
-	// Done.
-	for (int arena_index = 1; arena_index < g_iArenaCount; arena_index++)
-	{
-		if (g_bRoundStarted[arena_index])
-		{
-			g_bRoundStarted[arena_index] = false;
-		}
-	}
 }
 
 /*
@@ -2899,7 +2898,7 @@ public Action Event_PlayerSpawn(Event event, const char[] name, bool dontBroadca
 		TF2_SetPlayerClass(iClient, TFClass_Pyro, false, true);
 		TF2_RespawnPlayer(iClient);
 	}
-
+	
 	for (int i = MaxClients; i; --i)
 	{
 		if (IsClientInGame(i) && IsPlayerAlive(i))
@@ -2919,48 +2918,45 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 	int arena_index = g_iPlayerArena[victim];
 	int victim_slot = g_iPlayerSlot[victim];
 	
-	if (g_bRoundStarted[arena_index] == true)
+	int iVictim = GetClientOfUserId(GetEventInt(event, "userid"));
+	
+	if (IsValidClient(iVictim))
 	{
-		int iVictim = GetClientOfUserId(GetEventInt(event, "userid"));
-		
-		if (IsValidClient(iVictim))
+		g_iLastDeadClient[g_iPlayerArena[iVictim]] = iVictim;
+		g_iLastDeadTeam[g_iPlayerArena[iVictim]] = GetClientTeam(iVictim);
+
+		int iInflictor = GetEventInt(event, "inflictor_entindex");
+		int iIndex = FindRocketByEntity(iInflictor);
+
+		if (iIndex != -1)
 		{
-			g_iLastDeadClient = iVictim;
-			g_iLastDeadTeam = GetClientTeam(iVictim);
-	
-			int iInflictor = GetEventInt(event, "inflictor_entindex");
-			int iIndex = FindRocketByEntity(iInflictor);
-	
-			if (iIndex != -1)
+			int iTarget = EntRefToEntIndex(g_iRocketTarget[iIndex]);
+			int iDeflections = g_iRocketDeflections[iIndex];
+
+			float fSpeed = CalculateSpeed(g_fRocketSpeed[iIndex]);
+
+			if (GetConVarBool(g_hCvarAnnounce))
 			{
-				int iTarget = EntRefToEntIndex(g_iRocketTarget[iIndex]);
-				int iDeflections = g_iRocketDeflections[iIndex];
-	
-				float fSpeed = CalculateSpeed(g_fRocketSpeed[iIndex]);
-	
-				if (GetConVarBool(g_hCvarAnnounce))
+				if (GetConVarBool(g_hCvarDeflectCountAnnounce))
 				{
-					if (GetConVarBool(g_hCvarDeflectCountAnnounce))
+					if (iVictim == iTarget)
 					{
-						if (iVictim == iTarget)
-						{
-							MC_PrintToChatAll("\x05%N\01 died to their rocket travelling \x05%.0f\x01 mph with \x05%i\x01 deflections!", g_iLastDeadClient, fSpeed, iDeflections);
-						}
-						else
-						{
-							MC_PrintToChatAll("\x05%N\x01 died to \x05%.15N's\x01 rocket travelling \x05%.0f\x01 mph with \x05%i\x01 deflections!", g_iLastDeadClient, iTarget, fSpeed, iDeflections);
-						}
+						MC_PrintToChatAll("\x05%N\01 died to their rocket travelling \x05%.0f\x01 mph with \x05%i\x01 deflections!", g_iLastDeadClient, fSpeed, iDeflections);
 					}
 					else
 					{
-						MC_PrintToChatAll("\x05%N\01 died to a rocket travelling \x05%.f\x01 mph!", g_iLastDeadClient, fSpeed);
+						MC_PrintToChatAll("\x05%N\x01 died to \x05%.15N's\x01 rocket travelling \x05%.0f\x01 mph with \x05%i\x01 deflections!", g_iLastDeadClient, iTarget, fSpeed, iDeflections);
 					}
+				}
+				else
+				{
+					MC_PrintToChatAll("\x05%N\01 died to a rocket travelling \x05%.f\x01 mph!", g_iLastDeadClient, fSpeed);
 				}
 			}
 		}
-	
-		SetRandomSeed(view_as<int>(GetGameTime()));
 	}
+
+	SetRandomSeed(view_as<int>(GetGameTime()));
 	
 	int killer_slot = (victim_slot == SLOT_ONE || victim_slot == SLOT_THREE) ? SLOT_TWO : SLOT_ONE;
 	int killer = g_iArenaQueue[arena_index][killer_slot];
@@ -2971,13 +2967,6 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 	int killer_team_slot = (killer_slot > 2) ? (killer_slot - 2) : killer_slot;
 	int victim_team_slot = (victim_slot > 2) ? (victim_slot - 2) : victim_slot;
 	
-	// don't detect dead ringer deaths
-	int victim_deathflags = event.GetInt("death_flags");
-	if (victim_deathflags & 32)
-	{
-		return Plugin_Continue;
-	}
-	
 	if (g_bFourPersonArena[arena_index])
 	{
 		victim_teammate = getTeammate(victim, victim_slot, arena_index);
@@ -2985,7 +2974,9 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 	}
 	
 	if (!arena_index)
+	{
 		ChangeClientTeam(victim, TEAM_SPEC);
+	}
 	
 	int attacker = GetClientOfUserId(event.GetInt("attacker"));
 	
@@ -3013,10 +3004,9 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 	//Currently set up so that if its a 2v2 duel the round will reset after both players on one team die and a point will be added for that round to the other team
 	//Another possibility is to make it like dm where its instant respawn for every player, killer gets hp, and a point is awarded for every kill
 	
-	
 	int fraglimit = g_iArenaFraglimit[arena_index];
 	
-	if (!g_bFourPersonArena[arena_index] || (g_bFourPersonArena[arena_index] && !IsPlayerAlive(victim_teammate)))
+	if (g_bFourPersonArena[arena_index] && !IsPlayerAlive(victim_teammate) || !g_bFourPersonArena[arena_index])
 	{
 		g_iArenaStatus[arena_index] = AS_AFTERFIGHT;
 		
@@ -3025,14 +3015,13 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 			KillTimer(g_hTimerHud);
 			g_hTimerHud = INVALID_HANDLE;
 		}
-		if (g_hLogicTimer != INVALID_HANDLE)
-		{
-			KillTimer(g_hLogicTimer);
-			g_hLogicTimer = INVALID_HANDLE;
-		}
+		//if (g_hLogicTimer != INVALID_HANDLE)
+		//{
+		//	KillTimer(g_hLogicTimer);
+		//	g_hLogicTimer = INVALID_HANDLE;
+		//}
 		
 		DestroyRockets();
-		g_bRoundStarted[arena_index] = false;
 	}
 	
 	if (g_iArenaStatus[arena_index] >= AS_FIGHT && g_iArenaStatus[arena_index] < AS_REPORTED && fraglimit > 0 && g_iArenaScore[arena_index][killer_team_slot] >= fraglimit)
@@ -3089,10 +3078,16 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 	}
 	else
 	{
-		if (!g_bFourPersonArena[arena_index])
+		if(!g_bFourPersonArena[arena_index])
 		{
 			ResetKiller(killer, arena_index);
+			CreateTimer(3.0, Timer_NewRound, arena_index);
 		}
+		else if (g_bFourPersonArena[arena_index] && !IsPlayerAlive(victim_teammate))
+		{
+			CreateTimer(3.0, Timer_NewRound, arena_index);
+		}
+		
 		if (g_bFourPersonArena[arena_index] && (GetClientTeam(victim_teammate) == TEAM_SPEC || !IsPlayerAlive(victim_teammate)))
 		{
 			//Reset the teams
@@ -3125,6 +3120,7 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 				
 			g_iArenaStatus[arena_index] = AS_FIGHT;
 			*/
+			
 			CreateTimer(0.1, Timer_NewRound, arena_index);
 		}
 		
@@ -3135,7 +3131,7 @@ public Action Event_PlayerDeath(Event event, const char[] name, bool dontBroadca
 			//change the player to spec to keep him from respawning 
 			CreateTimer(5.0, Timer_ChangePlayerSpec, victim);
 			//instead of respawning him
-			//CreateTimer(g_fArenaRespawnTime[arena_index],Timer_ResetPlayer,GetClientUserId(victim));
+			CreateTimer(g_fArenaRespawnTime[arena_index], Timer_ResetPlayer, GetClientUserId(victim));
 		}
 		else
 			CreateTimer(g_fArenaRespawnTime[arena_index], Timer_ResetPlayer, GetClientUserId(victim));
@@ -3183,7 +3179,6 @@ public Action Event_PlayerTeam(Event event, const char[] name, bool dontBroadcas
 		
 		if (arena_index == 0)
 		{
-			
 			TF2_SetPlayerClass(client, view_as<TFClassType>(0));
 		}
 	}
@@ -3242,61 +3237,6 @@ public Action Event_ObjectDeflected(Handle event, const char[] name, bool dontBr
 	}
 }
 
-//   ___                     _
-//  / __|__ _ _ __  ___ _ __| |__ _ _  _
-// | (_ / _` | '  \/ -_) '_ \ / _` | || |
-//  \___\__,_|_|_|_\___| .__/_\__,_|\_, |
-//                     |_|          |__/
-
-/* OnDodgeBallGameFrame()
-**
-** Every tick of the Dodgeball logic.
-** -------------------------------------------------------------------------- */
-public Action OnDodgeBallGameFrame(Handle hTimer, any Data)
-{
-	// Only if both teams are playing
-	if (BothTeamsPlaying() == false)
-	{
-		return;
-	}
-
-	// Check if we need to fire more rockets.
-	if (GetGameTime() >= g_fNextRocketSpawnTime)
-	{
-		if (g_iLastDeadTeam == view_as<int>(TFTeam_Red))
-		{
-			int iSpawnerEntity = g_iRocketSpawnPointsRedEntity[g_iCurrentRedRocketSpawn];
-			int iSpawnerClass = g_iRocketSpawnPointsRedClass[g_iCurrentRedRocketSpawn];
-			if (g_iRocketCount < g_iSpawnersMaxRockets[iSpawnerClass])
-			{
-				CreateRocket(iSpawnerEntity, iSpawnerClass, view_as<int>(TFTeam_Red));
-				g_iCurrentRedRocketSpawn = (g_iCurrentRedRocketSpawn + 1) % g_iRocketSpawnPointsRedCount;
-			}
-		}
-		else
-		{
-			int iSpawnerEntity = g_iRocketSpawnPointsBluEntity[g_iCurrentBluRocketSpawn];
-			int iSpawnerClass = g_iRocketSpawnPointsBluClass[g_iCurrentBluRocketSpawn];
-			if (g_iRocketCount < g_iSpawnersMaxRockets[iSpawnerClass])
-			{
-				CreateRocket(iSpawnerEntity, iSpawnerClass, view_as<int>(TFTeam_Blue));
-				g_iCurrentBluRocketSpawn = (g_iCurrentBluRocketSpawn + 1) % g_iRocketSpawnPointsBluCount;
-			}
-		}
-	}
-
-	// Manage the active rockets
-	int iIndex = -1;
-	while ((iIndex = FindNextValidRocket(iIndex)) != -1)
-	{
-		switch (g_iRocketClassBehaviour[g_iRocketClass[iIndex]])
-		{
-			case Behaviour_Unknown: {  }
-			case Behaviour_Homing: { HomingRocketThink(iIndex); }
-		}
-	}
-}
-
 /*
 ** ------------------------------------------------------------------
 **	 _______                          
@@ -3340,7 +3280,9 @@ public Action Timer_SpecFix(Handle timer, int userid)
 public Action Timer_SpecHudToAllArenas(Handle timer, int userid)
 {
 	for (int i = 1; i <= g_iArenaCount; i++)
-	ShowSpecHudToArena(i);
+	{
+		ShowSpecHudToArena(i);
+	}
 	
 	return Plugin_Continue;
 }
@@ -3362,34 +3304,6 @@ public Action Timer_CountDown(Handle timer, any arena_index)
 		{
 			g_iArenaCd[arena_index]--;
 			
-			if (g_iArenaCd[arena_index] > 0)
-			{  // blocking +attack
-				float enginetime = GetGameTime();
-				
-				for (int i = 0; i <= 2; i++)
-				{
-					int ent = GetPlayerWeaponSlot(red_f1, i);
-					
-					if (IsValidEntity(ent))
-						SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + float(g_iArenaCd[arena_index]));
-					
-					ent = GetPlayerWeaponSlot(blu_f1, i);
-					
-					if (IsValidEntity(ent))
-						SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + float(g_iArenaCd[arena_index]));
-					
-					ent = GetPlayerWeaponSlot(red_f2, i);
-					
-					if (IsValidEntity(ent))
-						SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + float(g_iArenaCd[arena_index]));
-					
-					ent = GetPlayerWeaponSlot(blu_f2, i);
-					
-					if (IsValidEntity(ent))
-						SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + float(g_iArenaCd[arena_index]));
-				}
-			}
-			
 			if (g_iArenaCd[arena_index] <= 3 && g_iArenaCd[arena_index] >= 1)
 			{
 				char msg[64];
@@ -3407,17 +3321,18 @@ public Action Timer_CountDown(Handle timer, any arena_index)
 				PrintCenterText(blu_f2, msg);
 				ShowCountdownToSpec(arena_index, msg);
 				g_iArenaStatus[arena_index] = AS_COUNTDOWN;
-			} else if (g_iArenaCd[arena_index] <= 0) {
+			} else if (g_iArenaCd[arena_index] <= 0)
+			{
 				g_iArenaStatus[arena_index] = AS_FIGHT;
 				
-				g_bRoundStarted[arena_index] = true;
-				g_iRocketSpeed = 0;
+				g_iRocketSpeed[arena_index] = 0;
+				
 				if (g_hTimerHud != INVALID_HANDLE)
 				{
 					KillTimer(g_hTimerHud);
 					g_hTimerHud = INVALID_HANDLE;
 				}
-				g_hTimerHud = CreateTimer(1.0, Timer_HudSpeed, _, TIMER_REPEAT);
+				g_hTimerHud = CreateTimer(1.0, Timer_HudSpeed, arena_index, TIMER_REPEAT);
 				
 				char msg[64];
 				Format(msg, sizeof(msg), "FIGHT", g_iArenaCd[arena_index]);
@@ -3444,24 +3359,6 @@ public Action Timer_CountDown(Handle timer, any arena_index)
 		if (red_f1 && blu_f1)
 		{
 			g_iArenaCd[arena_index]--;
-			
-			if (g_iArenaCd[arena_index] > 0)
-			{  // blocking +attack
-				float enginetime = GetGameTime();
-				
-				for (int i = 0; i <= 2; i++)
-				{
-					int ent = GetPlayerWeaponSlot(red_f1, i);
-					
-					if (IsValidEntity(ent))
-						SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + float(g_iArenaCd[arena_index]));
-					
-					ent = GetPlayerWeaponSlot(blu_f1, i);
-					
-					if (IsValidEntity(ent))
-						SetEntPropFloat(ent, Prop_Send, "m_flNextPrimaryAttack", enginetime + float(g_iArenaCd[arena_index]));
-				}
-			}
 			
 			if (g_iArenaCd[arena_index] <= 3 && g_iArenaCd[arena_index] >= 1)
 			{
@@ -3595,11 +3492,50 @@ public Action Timer_Tele(Handle timer, int userid)
 
 public Action Timer_NewRound(Handle timer, any arena_index)
 {
+	PopulateRocketSpawnPoints(arena_index);
+	
+	if (g_iLastDeadTeam[arena_index] == 0)
+	{
+		g_iLastDeadTeam[arena_index] = GetURandomIntRange(view_as<int>(TFTeam_Red), view_as<int>(TFTeam_Blue));
+	}
+	if (!IsValidClient(g_iLastDeadClient[arena_index]))
+	{
+		g_iLastDeadClient[arena_index] = 0;
+	}
+	
+	g_iPlayerCount[arena_index] = CountAlivePlayers(arena_index);
+	g_iRocketsFired[arena_index] = 0;
+	g_iCurrentRedRocketSpawn[arena_index] = 0;
+	g_iCurrentBluRocketSpawn[arena_index] = 0;
+	g_fNextRocketSpawnTime[arena_index] = GetGameTime();
+	
 	StartCountDown(arena_index);
 }
 
 public Action Timer_StartDuel(Handle timer, any arena_index)
 {
+	if (g_hLogicTimer == INVALID_HANDLE)
+	{
+		g_hLogicTimer = CreateTimer(FPS_LOGIC_INTERVAL, OnDodgeBallGameFrame, _, TIMER_REPEAT);
+	}
+	
+	PopulateRocketSpawnPoints(arena_index);
+	
+	if (g_iLastDeadTeam[arena_index] == 0)
+	{
+		g_iLastDeadTeam[arena_index] = GetURandomIntRange(view_as<int>(TFTeam_Red), view_as<int>(TFTeam_Blue));
+	}
+	if (!IsValidClient(g_iLastDeadClient[arena_index]))
+	{
+		g_iLastDeadClient[arena_index] = 0;
+	}
+	
+	g_iPlayerCount[arena_index] = CountAlivePlayers(arena_index);
+	g_iRocketsFired[arena_index] = 0;
+	g_iCurrentRedRocketSpawn[arena_index] = 0;
+	g_iCurrentBluRocketSpawn[arena_index] = 0;
+	g_fNextRocketSpawnTime[arena_index] = GetGameTime();
+	
 	g_iArenaScore[arena_index][SLOT_ONE] = 0;
 	g_iArenaScore[arena_index][SLOT_TWO] = 0;
 	ShowPlayerHud(g_iArenaQueue[arena_index][SLOT_ONE]);
@@ -3718,16 +3654,16 @@ public Action Timer_RegenArena(Handle timer, any arena_index)
 	return Plugin_Continue;
 }
 
-public Action Timer_HudSpeed(Handle hTimer)
+public Action Timer_HudSpeed(Handle hTimer, int arena_index)
 {
 	if (GetConVarBool(g_hCvarSpeedo))
 	{
 		SetHudTextParams(-1.0, 0.9, 1.1, 255, 255, 255, 255);
 		for (int iClient = 1; iClient <= MaxClients; iClient++)
 		{
-			if (IsValidClient(iClient) && !IsFakeClient(iClient) && g_iRocketSpeed != 0)
+			if (IsValidClient(iClient) && !IsFakeClient(iClient) && g_iRocketSpeed[g_iPlayerArena[iClient]] != 0 && g_iPlayerArena[iClient] == arena_index)
 			{
-				ShowSyncHudText(iClient, g_hHud, "Speed: %i mph", g_iRocketSpeed);
+				ShowSyncHudText(iClient, g_hHud, "Speed: %i mph", g_iRocketSpeed[g_iPlayerArena[iClient]]);
 			}
 		}
 	}
@@ -3845,9 +3781,38 @@ stock void LerpVectors(float fA[3], float fB[3], float fC[3], float t)
 	fC[2] = fA[2] + (fB[2] - fA[2]) * t;
 }
 
-/* BothTeamsPlaying()
+/* BothTeamsPlayingInArea()
 **
-** Checks if there are players on both teams.
+** Checks if there are players on both teams in the given arena.
+** -------------------------------------------------------------------------- */
+stock bool BothTeamsPlayingInArea(int arena_index)
+{
+	bool bRedFound;
+	bool bBluFound;
+	for (int iClient = 1; iClient <= MaxClients; iClient++)
+	{
+		if (IsValidClient(iClient, true) == false || (g_iPlayerArena[iClient] != arena_index && !IsFakeClient(iClient)))
+		{
+			continue;
+		}
+		
+		int iTeam = GetClientTeam(iClient);
+		if (iTeam == view_as<int>(TFTeam_Red))
+		{
+			bRedFound = true;
+		}
+		
+		if (iTeam == view_as<int>(TFTeam_Blue))
+		{
+			bBluFound = true;
+		}
+	}
+	return bRedFound && bBluFound;
+}
+
+/* BothTeamsPlayingInArea()
+**
+** Checks if there are players on both teams..
 ** -------------------------------------------------------------------------- */
 stock bool BothTeamsPlaying()
 {
@@ -3855,24 +3820,38 @@ stock bool BothTeamsPlaying()
 	bool bBluFound;
 	for (int iClient = 1; iClient <= MaxClients; iClient++)
 	{
-		if (IsValidClient(iClient, true) == false)continue;
+		if (IsValidClient(iClient, true) == false)
+		{
+			continue;
+		}
+		
 		int iTeam = GetClientTeam(iClient);
-		if (iTeam == view_as<int>(TFTeam_Red))bRedFound = true;
-		if (iTeam == view_as<int>(TFTeam_Blue))bBluFound = true;
+		if (iTeam == view_as<int>(TFTeam_Red))
+		{
+			bRedFound = true;
+		}
+		
+		if (iTeam == view_as<int>(TFTeam_Blue))
+		{
+			bBluFound = true;
+		}
 	}
 	return bRedFound && bBluFound;
 }
 
 /* CountAlivePlayers()
 **
-** Retrieves the number of players alive.
+** Retrieves the number of players alive in the specified arena.
 ** -------------------------------------------------------------------------- */
-stock int CountAlivePlayers()
+stock int CountAlivePlayers(int arena_index)
 {
 	int iCount = 0;
 	for (int iClient = 1; iClient <= MaxClients; iClient++)
 	{
-		if (IsValidClient(iClient, true))iCount++;
+		if (IsValidClient(iClient, true) && (g_iPlayerArena[iClient] == arena_index || IsFakeClient(iClient)))
+		{	
+			iCount++;
+		}
 	}
 	return iCount;
 }
@@ -3893,9 +3872,9 @@ stock int GetTotalClientCount() {
 
 /* SelectTarget()
 **
-** Determines a random target of the given team for the homing rocket.
+** Determines a random target of the given team in the given arena for the homing rocket.
 ** -------------------------------------------------------------------------- */
-stock int SelectTarget(int iTeam, int iRocket = -1)
+stock int SelectTarget(int iTeam, int arena_index, int iRocket = -1)
 {
 	int iTarget = -1;
 	float fTargetWeight = 0.0;
@@ -3919,8 +3898,20 @@ stock int SelectTarget(int iTeam, int iRocket = -1)
 	for (int iClient = 1; iClient <= MaxClients; iClient++)
 	{
 		// If the client isn't connected, skip.
-		if (!IsValidClient(iClient, true))continue;
-		if (iTeam && GetClientTeam(iClient) != iTeam)continue;
+		if (!IsValidClient(iClient, true))
+		{
+			continue;
+		}
+		
+		if (iTeam && GetClientTeam(iClient) != iTeam)
+		{
+			continue;
+		}
+		
+		if (g_iPlayerArena[iClient] != arena_index && !IsFakeClient(iClient))
+		{
+			continue;
+		}
 
 		// Determine if this client should be the target.
 		float fNewWeight = GetURandomFloatRange(0.0, 100.0);
@@ -4311,13 +4302,13 @@ public Action TauntCheck(int victim, int &attacker, int &inflictor, float &damag
 	return Plugin_Continue;
 }
 
-void checkRoundDelays(int entId)
+void checkRoundDelays(int entId, int arena_index)
 {
 	int iEntity = EntRefToEntIndex(g_iRocketEntity[entId]);
 	int iTarget = EntRefToEntIndex(g_iRocketTarget[entId]);
 	float timeToCheck;
 	if (g_iRocketDeflections[entId] == 0)
-		timeToCheck = g_fLastRocketSpawnTime;
+		timeToCheck = g_fLastRocketSpawnTime[arena_index];
 	else
 		timeToCheck = g_fRocketLastDeflectionTime[entId];
 	
@@ -4349,42 +4340,52 @@ stock void SetMainRocketClass(int Index, bool isVote, int client = 0)
 		sCurrentDragType = "aim";
 	}
 	PrintToChatAll("Current Rocket Drag Type: %s", sCurrentDragType);
-	int iSpawnerClassRed = g_iRocketSpawnPointsRedClass[g_iCurrentRedRocketSpawn];
-	char strBufferRed[256];
-	strcopy(strBufferRed, sizeof(strBufferRed), "Red");
 	
-	Format(strBufferRed, sizeof(strBufferRed), "%s%%", g_strRocketClassName[Index]);
-	SetArrayCell(g_hRocketSpawnersChancesTable[iSpawnerClassRed], Index, 100);
+	int iClass = 0;
 	
-	for (int iClassIndex = 0; iClassIndex < g_iRocketClassCount; iClassIndex++)
+	for (int arena_index = 1; arena_index <= g_iArenaCount; arena_index++)
 	{
-		if (!(iClassIndex == Index))
+		int iSpawnerClassRed = g_iRocketSpawnPointsRedClass[g_iCurrentRedRocketSpawn[arena_index]][arena_index];
+		char strBufferRed[256];
+		strcopy(strBufferRed, sizeof(strBufferRed), "Red");
+		
+		Format(strBufferRed, sizeof(strBufferRed), "%s%%", g_strRocketClassName[Index]);
+		SetArrayCell(g_hRocketSpawnersChancesTable[iSpawnerClassRed], Index, 100);
+		
+		for (int iClassIndex = 0; iClassIndex < g_iRocketClassCount; iClassIndex++)
 		{
-			Format(strBufferRed, sizeof(strBufferRed), "%s%%", g_strRocketClassName[iClassIndex]);
-			SetArrayCell(g_hRocketSpawnersChancesTable[iSpawnerClassRed], iClassIndex, 0);
+			if (!(iClassIndex == Index))
+			{
+				Format(strBufferRed, sizeof(strBufferRed), "%s%%", g_strRocketClassName[iClassIndex]);
+				SetArrayCell(g_hRocketSpawnersChancesTable[iSpawnerClassRed], iClassIndex, 0);
+			}
+		}
+		
+		if (arena_index == 1)
+		{
+			iClass = GetRandomRocketClass(iSpawnerClassRed);
+		}
+		
+		int iSpawnerClassBlu = g_iRocketSpawnPointsBluClass[g_iCurrentBluRocketSpawn[arena_index]][arena_index];
+		char strBufferBlue[256];
+		strcopy(strBufferBlue, sizeof(strBufferBlue), "Blue");
+		
+		Format(strBufferBlue, sizeof(strBufferBlue), "%s%%", g_strRocketClassName[Index]);
+		SetArrayCell(g_hRocketSpawnersChancesTable[iSpawnerClassBlu], Index, 100);
+		
+		char strSelectionBlue[256];
+		strcopy(strSelectionBlue, sizeof(strBufferBlue), strBufferBlue);
+		
+		for (int iClassIndex = 0; iClassIndex < g_iRocketClassCount; iClassIndex++)
+		{
+			if (!(iClassIndex == Index))
+			{
+				Format(strBufferBlue, sizeof(strBufferBlue), "%s%%", g_strRocketClassName[iClassIndex]);
+				SetArrayCell(g_hRocketSpawnersChancesTable[iSpawnerClassBlu], iClassIndex, 0);
+			}
 		}
 	}
 	
-	int iSpawnerClassBlu = g_iRocketSpawnPointsBluClass[g_iCurrentBluRocketSpawn];
-	char strBufferBlue[256];
-	strcopy(strBufferBlue, sizeof(strBufferBlue), "Blue");
-	
-	Format(strBufferBlue, sizeof(strBufferBlue), "%s%%", g_strRocketClassName[Index]);
-	SetArrayCell(g_hRocketSpawnersChancesTable[iSpawnerClassBlu], Index, 100);
-	
-	char strSelectionBlue[256];
-	strcopy(strSelectionBlue, sizeof(strBufferBlue), strBufferBlue);
-	
-	for (int iClassIndex = 0; iClassIndex < g_iRocketClassCount; iClassIndex++)
-	{
-		if (!(iClassIndex == Index))
-		{
-			Format(strBufferBlue, sizeof(strBufferBlue), "%s%%", g_strRocketClassName[iClassIndex]);
-			SetArrayCell(g_hRocketSpawnersChancesTable[iSpawnerClassBlu], iClassIndex, 0);
-		}
-	}
-	
-	int iClass = GetRandomRocketClass(iSpawnerClassRed);
 	strcopy(g_strSavedClassName, sizeof(g_strSavedClassName), g_strRocketClassLongName[iClass]);
 	
 	if (isVote)
